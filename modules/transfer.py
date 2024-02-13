@@ -12,6 +12,7 @@ from io import BytesIO
 import asyncio
 from modules.client import onedrive
 from modules.global_var import PART_SIZE
+from modules.log import logger
 
 
 async def download_part(client, input_location, offset):
@@ -26,6 +27,8 @@ async def download_part(client, input_location, offset):
 async def multi_parts_uploader(
     client, document, name, conn_num=5, progress_callback=None
 ):
+    logger('DEBUG: enter multi_parts_uploader')
+
     input_location = types.InputDocumentFileLocation(
         id=document.id,
         access_hash=document.access_hash,
@@ -35,6 +38,8 @@ async def multi_parts_uploader(
 
     upload_session = onedrive.multipart_upload_session_builder(name)
     uploader = onedrive.multipart_uploader(upload_session, document.size)
+
+    logger('DEBUG: finish upload session and uploader creation')
 
     task_list = []
     total_part_num = (
@@ -50,6 +55,8 @@ async def multi_parts_uploader(
             await cor
 
     buffer = BytesIO()
+
+    logger('DEBUG: finish initialization')
     while current_part_num < total_part_num:
         task_list.append(
             asyncio.ensure_future(download_part(client, input_location, offset))
@@ -61,9 +68,11 @@ async def multi_parts_uploader(
             for part in await asyncio.gather(*task_list):
                 buffer.write(part)
                 current_size += len(part)
+            logger('DEBUG: finish part download')
             task_list.clear()
             buffer.seek(0)
             response_dict = await onedrive.multipart_upload(uploader, buffer, pre_offset)
+            logger('DEBUG: finish part upload')
             pre_offset = offset
             buffer = BytesIO()
             if progress_callback:
